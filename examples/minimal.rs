@@ -191,12 +191,15 @@ impl SimpleGuiRenderer {
         // Add device features
         let features = Features::none();
         let (device, mut queues) = {
-            Device::new(physical, DeviceCreateInfo {
-                enabled_extensions: physical.required_extensions().union(&device_extensions),
-                enabled_features: features,
-                queue_create_infos: vec![QueueCreateInfo::family(queue_family)],
-                _ne: Default::default(),
-            })
+            Device::new(
+                physical,
+                DeviceCreateInfo {
+                    enabled_extensions: physical.required_extensions().union(&device_extensions),
+                    enabled_features: features,
+                    queue_create_infos: vec![QueueCreateInfo::family(queue_family)],
+                    _ne: Default::default(),
+                },
+            )
             .expect("failed to create device")
         };
         (device, queues.next().unwrap())
@@ -214,15 +217,23 @@ impl SimpleGuiRenderer {
             Some(physical.surface_formats(&surface, Default::default()).unwrap()[0].0);
         let image_extent = surface.window().inner_size().into();
 
-        let (swapchain, images) = Swapchain::new(device, surface, SwapchainCreateInfo {
-            min_image_count: surface_capabilities.min_image_count,
-            image_format,
-            image_extent,
-            image_usage: ImageUsage::color_attachment(),
-            composite_alpha: surface_capabilities.supported_composite_alpha.iter().next().unwrap(),
-            present_mode,
-            ..Default::default()
-        })
+        let (swapchain, images) = Swapchain::new(
+            device,
+            surface,
+            SwapchainCreateInfo {
+                min_image_count: surface_capabilities.min_image_count,
+                image_format,
+                image_extent,
+                image_usage: ImageUsage::color_attachment(),
+                composite_alpha: surface_capabilities
+                    .supported_composite_alpha
+                    .iter()
+                    .next()
+                    .unwrap(),
+                present_mode,
+                ..Default::default()
+            },
+        )
         .unwrap();
         let images = images
             .into_iter()

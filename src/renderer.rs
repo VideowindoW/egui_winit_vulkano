@@ -15,12 +15,13 @@ use egui::{epaint::Mesh, ClippedMesh, Rect, TexturesDelta};
 use vulkano::{
     buffer::{BufferAccess, BufferUsage, CpuAccessibleBuffer, TypedBufferAccess},
     command_buffer::{
-        AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer,
-        PrimaryCommandBuffer, SecondaryAutoCommandBuffer, SubpassContents,
+        AutoCommandBufferBuilder, BlitImageInfo, CommandBufferUsage, CopyBufferToImageInfo,
+        PrimaryAutoCommandBuffer, PrimaryCommandBuffer, RenderPassBeginInfo,
+        SecondaryAutoCommandBuffer, SubpassContents,
     },
     descriptor_set::{layout::DescriptorSetLayout, PersistentDescriptorSet, WriteDescriptorSet},
     device::{Device, Queue},
-    format::{ClearValue, Format},
+    format::Format,
     image::{ImageAccess, ImageUsage, ImageViewAbstract},
     pipeline::{
         graphics::{
@@ -38,7 +39,7 @@ use vulkano::{
     DeviceSize,
 };
 
-use crate::utils::mutable_image_with_usage;
+use super::utils::mutable_image_with_usage;
 
 const VERTICES_PER_QUAD: DeviceSize = 4;
 const VERTEX_BUFFER_SIZE: DeviceSize = 1024 * 1024 * VERTICES_PER_QUAD;
@@ -208,19 +209,21 @@ impl Renderer {
         layout: &Arc<DescriptorSetLayout>,
         image: Arc<dyn ImageViewAbstract + 'static>,
     ) -> Arc<PersistentDescriptorSet> {
-        let sampler = Sampler::new(gfx_queue.device().clone(), SamplerCreateInfo {
-            mag_filter: Filter::Linear,
-            min_filter: Filter::Linear,
-            address_mode: [SamplerAddressMode::ClampToEdge; 3],
-            mipmap_mode: SamplerMipmapMode::Linear,
-            ..Default::default()
-        })
+        let sampler = Sampler::new(
+            gfx_queue.device().clone(),
+            SamplerCreateInfo {
+                mag_filter: Filter::Linear,
+                min_filter: Filter::Linear,
+                address_mode: [SamplerAddressMode::ClampToEdge; 3],
+                mipmap_mode: SamplerMipmapMode::Linear,
+                ..Default::default()
+            },
+        )
         .unwrap();
-        PersistentDescriptorSet::new(layout.clone(), [WriteDescriptorSet::image_view_sampler(
-            0,
-            image.clone(),
-            sampler,
-        )])
+        PersistentDescriptorSet::new(
+            layout.clone(),
+            [WriteDescriptorSet::image_view_sampler(0, image.clone(), sampler)],
+        )
         .unwrap()
     }
 
@@ -263,7 +266,7 @@ impl Renderer {
         // Create buffer to be copied to the image
         let texture_data_buffer = CpuAccessibleBuffer::from_iter(
             self.gfx_queue.device().clone(),
-            BufferUsage::transfer_source(),
+            BufferUsage::transfer_src(),
             false,
             data,
         )
@@ -274,8 +277,8 @@ impl Renderer {
             [delta.image.width() as u32, delta.image.height() as u32],
             self.format,
             ImageUsage {
-                transfer_destination: true,
-                transfer_source: true,
+                transfer_dst: true,
+                transfer_src: true,
                 sampled: true,
                 ..ImageUsage::none()
             },
@@ -290,33 +293,27 @@ impl Renderer {
         )
         .unwrap();
         // Copy buffer to image
-        cbb.copy_buffer_to_image(texture_data_buffer, font_image.image()).unwrap();
+        cbb.copy_buffer_to_image(CopyBufferToImageInfo::buffer_image(
+            texture_data_buffer,
+            font_image.image(),
+        ))
+        .unwrap();
 
         // Blit texture data to existing image if delta pos exists (e.g. font changed)
         if let Some(pos) = delta.pos {
             if let Some(existing_image) = self.texture_images.get(&texture_id) {
                 let src_dims = font_image.image().dimensions();
-                let top_left = [pos[0] as i32, pos[1] as i32, 0];
+                let top_left = [pos[0] as u32, pos[1] as u32, 0];
                 let bottom_right = [
-                    pos[0] as i32 + src_dims.width() as i32,
-                    pos[1] as i32 + src_dims.height() as i32,
+                    pos[0] as u32 + src_dims.width() as u32,
+                    pos[1] as u32 + src_dims.height() as u32,
                     1,
                 ];
-                cbb.blit_image(
-                    font_image.image(),
-                    [0, 0, 0],
-                    [src_dims.width() as i32, src_dims.height() as i32, 1],
-                    0,
-                    0,
-                    existing_image.image(),
-                    top_left,
-                    bottom_right,
-                    0,
-                    0,
-                    1,
-                    Filter::Nearest,
-                )
-                .unwrap();
+                let mut blit_info =
+                    BlitImageInfo::images(font_image.image(), existing_image.image());
+                blit_info.regions[0].dst_offsets[0] = top_left;
+                blit_info.regions[0].dst_offsets[1] = bottom_right;
+                cbb.blit_image(blit_info).unwrap();
             }
             // Otherwise save the newly created image
         } else {
@@ -451,10 +448,11 @@ impl Renderer {
         )
         .unwrap();
         // Add clear values here for attachments and begin render pass
+        let mut render_pass_begin_info = RenderPassBeginInfo::framebuffer(framebuffer);
+        render_pass_begin_info.clear_values =
+            vec![if !self.is_overlay { Some([0.0; 4].into()) } else { None }];
         command_buffer_builder
-            .begin_render_pass(framebuffer, SubpassContents::SecondaryCommandBuffers, vec![
-                if !self.is_overlay { [0.0; 4].into() } else { ClearValue::None },
-            ])
+            .begin_render_pass(render_pass_begin_info, SubpassContents::SecondaryCommandBuffers)
             .unwrap();
         (command_buffer_builder, img_dims)
     }
@@ -578,14 +576,17 @@ impl Renderer {
             let desc_set = self.texture_desc_sets.get(&mesh.texture_id).unwrap().clone();
             builder
                 .bind_pipeline_graphics(self.pipeline.clone())
-                .set_viewport(0, vec![Viewport {
-                    origin: [0.0, 0.0],
-                    dimensions: [
-                        framebuffer_dimensions[0] as f32,
-                        framebuffer_dimensions[1] as f32,
-                    ],
-                    depth_range: 0.0..1.0,
-                }])
+                .set_viewport(
+                    0,
+                    vec![Viewport {
+                        origin: [0.0, 0.0],
+                        dimensions: [
+                            framebuffer_dimensions[0] as f32,
+                            framebuffer_dimensions[1] as f32,
+                        ],
+                        depth_range: 0.0..1.0,
+                    }],
+                )
                 .set_scissor(0, scissors)
                 .bind_descriptor_sets(
                     PipelineBindPoint::Graphics,

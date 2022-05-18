@@ -17,7 +17,7 @@ use cgmath::Matrix4;
 use vulkano::{
     command_buffer::{
         AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer,
-        SecondaryCommandBuffer, SubpassContents,
+        RenderPassBeginInfo, SecondaryCommandBuffer, SubpassContents,
     },
     device::Queue,
     format::Format,
@@ -97,10 +97,13 @@ impl FrameSystem {
             )
             .unwrap();
         }
-        let framebuffer = Framebuffer::new(self.render_pass.clone(), FramebufferCreateInfo {
-            attachments: vec![final_image, self.depth_buffer.clone()],
-            ..Default::default()
-        })
+        let framebuffer = Framebuffer::new(
+            self.render_pass.clone(),
+            FramebufferCreateInfo {
+                attachments: vec![final_image, self.depth_buffer.clone()],
+                ..Default::default()
+            },
+        )
         .unwrap();
         let mut command_buffer_builder = AutoCommandBufferBuilder::primary(
             self.gfx_queue.device().clone(),
@@ -108,11 +111,13 @@ impl FrameSystem {
             CommandBufferUsage::OneTimeSubmit,
         )
         .unwrap();
+
+        let mut render_pass_begin_info = RenderPassBeginInfo::framebuffer(framebuffer.clone());
+        render_pass_begin_info.clear_values =
+            vec![Some([0.0, 0.0, 0.0, 0.0].into()), Some(1.0f32.into())];
+
         command_buffer_builder
-            .begin_render_pass(framebuffer.clone(), SubpassContents::SecondaryCommandBuffers, vec![
-                [0.0, 0.0, 0.0, 0.0].into(),
-                1.0f32.into(),
-            ])
+            .begin_render_pass(render_pass_begin_info, SubpassContents::SecondaryCommandBuffers)
             .unwrap();
 
         Frame {

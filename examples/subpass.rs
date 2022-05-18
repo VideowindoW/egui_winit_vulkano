@@ -14,7 +14,9 @@ use egui::{ScrollArea, TextEdit, TextStyle};
 use egui_winit_vulkano::Gui;
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer, TypedBufferAccess},
-    command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, SubpassContents},
+    command_buffer::{
+        AutoCommandBufferBuilder, CommandBufferUsage, RenderPassBeginInfo, SubpassContents,
+    },
     device::{
         physical::PhysicalDevice, Device, DeviceCreateInfo, DeviceExtensions, Features, Queue,
         QueueCreateInfo,
@@ -231,12 +233,15 @@ impl SimpleGuiRenderer {
         // Add device features
         let features = Features::none();
         let (device, mut queues) = {
-            Device::new(physical, DeviceCreateInfo {
-                enabled_extensions: physical.required_extensions().union(&device_extensions),
-                enabled_features: features,
-                queue_create_infos: vec![QueueCreateInfo::family(queue_family)],
-                _ne: Default::default(),
-            })
+            Device::new(
+                physical,
+                DeviceCreateInfo {
+                    enabled_extensions: physical.required_extensions().union(&device_extensions),
+                    enabled_features: features,
+                    queue_create_infos: vec![QueueCreateInfo::family(queue_family)],
+                    _ne: Default::default(),
+                },
+            )
             .expect("failed to create device")
         };
         (device, queues.next().unwrap())
@@ -254,15 +259,23 @@ impl SimpleGuiRenderer {
             Some(physical.surface_formats(&surface, Default::default()).unwrap()[0].0);
         let image_extent = surface.window().inner_size().into();
 
-        let (swapchain, images) = Swapchain::new(device, surface, SwapchainCreateInfo {
-            min_image_count: surface_capabilities.min_image_count,
-            image_format,
-            image_extent,
-            image_usage: ImageUsage::color_attachment(),
-            composite_alpha: surface_capabilities.supported_composite_alpha.iter().next().unwrap(),
-            present_mode,
-            ..Default::default()
-        })
+        let (swapchain, images) = Swapchain::new(
+            device,
+            surface,
+            SwapchainCreateInfo {
+                min_image_count: surface_capabilities.min_image_count,
+                image_format,
+                image_extent,
+                image_usage: ImageUsage::color_attachment(),
+                composite_alpha: surface_capabilities
+                    .supported_composite_alpha
+                    .iter()
+                    .next()
+                    .unwrap(),
+                present_mode,
+                ..Default::default()
+            },
+        )
         .unwrap();
         let images = images
             .into_iter()
@@ -348,16 +361,21 @@ impl SimpleGuiRenderer {
         .unwrap();
 
         let dimensions = self.final_images[0].image().dimensions().width_height();
-        let framebuffer = Framebuffer::new(self.render_pass.clone(), FramebufferCreateInfo {
-            attachments: vec![self.final_images[image_num].clone()],
-            ..Default::default()
-        })
+        let framebuffer = Framebuffer::new(
+            self.render_pass.clone(),
+            FramebufferCreateInfo {
+                attachments: vec![self.final_images[image_num].clone()],
+                ..Default::default()
+            },
+        )
         .unwrap();
 
         // Begin render pipeline commands
-        let clear_values = vec![[0.0, 1.0, 0.0, 1.0].into()];
+        let clear_values = vec![Some([0.0, 1.0, 0.0, 1.0].into())];
+        let mut render_pass_begin_info = RenderPassBeginInfo::framebuffer(framebuffer);
+        render_pass_begin_info.clear_values = clear_values;
         builder
-            .begin_render_pass(framebuffer, SubpassContents::SecondaryCommandBuffers, clear_values)
+            .begin_render_pass(render_pass_begin_info, SubpassContents::SecondaryCommandBuffers)
             .unwrap();
 
         // Render first draw pass
@@ -370,11 +388,14 @@ impl SimpleGuiRenderer {
         .unwrap();
         secondary_builder
             .bind_pipeline_graphics(self.pipeline.clone())
-            .set_viewport(0, vec![Viewport {
-                origin: [0.0, 0.0],
-                dimensions: [dimensions[0] as f32, dimensions[1] as f32],
-                depth_range: 0.0..1.0,
-            }])
+            .set_viewport(
+                0,
+                vec![Viewport {
+                    origin: [0.0, 0.0],
+                    dimensions: [dimensions[0] as f32, dimensions[1] as f32],
+                    depth_range: 0.0..1.0,
+                }],
+            )
             .bind_vertex_buffers(0, self.vertex_buffer.clone())
             .draw(self.vertex_buffer.len() as u32, 1, 0, 0)
             .unwrap();
