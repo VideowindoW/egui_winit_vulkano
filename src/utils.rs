@@ -14,7 +14,7 @@ use vulkano::{
     device::Queue,
     image::{
         view::ImageView, ImageCreateFlags, ImageCreationError, ImageDimensions, ImageUsage,
-        ImageViewAbstract, ImmutableImage, MipmapsCount, StorageImage,
+        ImageViewAbstract, ImmutableImage, MipmapsCount, StorageImage, immutable::ImmutableImageCreationError,
     },
 };
 
@@ -43,7 +43,7 @@ pub fn immutable_texture_from_bytes(
     byte_data: &[u8],
     dimensions: [u32; 2],
     format: vulkano::format::Format,
-) -> Result<Arc<dyn ImageViewAbstract + Send + Sync + 'static>, ImageCreationError> {
+) -> Result<Arc<dyn ImageViewAbstract + Send + Sync + 'static>, ImmutableImageCreationError> {
     let vko_dims =
         ImageDimensions::Dim2d { width: dimensions[0], height: dimensions[1], array_layers: 1 };
 
@@ -62,7 +62,7 @@ pub fn immutable_texture_from_file(
     queue: Arc<Queue>,
     file_bytes: &[u8],
     format: vulkano::format::Format,
-) -> Result<Arc<dyn ImageViewAbstract + Send + Sync + 'static>, ImageCreationError> {
+) -> Result<Arc<dyn ImageViewAbstract + Send + Sync + 'static>, ImmutableImageCreationError> {
     use image::GenericImageView;
 
     let img = image::load_from_memory(file_bytes).expect("Failed to load image from bytes");

@@ -17,7 +17,7 @@ use vulkano::{
     command_buffer::{
         AutoCommandBufferBuilder, BlitImageInfo, CommandBufferUsage, CopyBufferToImageInfo,
         PrimaryAutoCommandBuffer, PrimaryCommandBuffer, RenderPassBeginInfo,
-        SecondaryAutoCommandBuffer, SubpassContents,
+        SecondaryAutoCommandBuffer, SubpassContents, CommandBufferInheritanceInfo,
     },
     descriptor_set::{layout::DescriptorSetLayout, PersistentDescriptorSet, WriteDescriptorSet},
     device::{Device, Queue},
@@ -58,6 +58,7 @@ vulkano::impl_vertex!(EguiVertex, position, tex_coords, color);
 pub struct Renderer {
     gfx_queue: Arc<Queue>,
     render_pass: Option<Arc<RenderPass>>,
+    subpass: Subpass,
     is_overlay: bool,
 
     format: vulkano::format::Format,
@@ -78,11 +79,12 @@ impl Renderer {
         subpass: Subpass,
     ) -> Renderer {
         let (vertex_buffer, index_buffer) = Self::create_buffers(gfx_queue.device().clone());
-        let pipeline = Self::create_pipeline(gfx_queue.clone(), subpass);
+        let pipeline = Self::create_pipeline(gfx_queue.clone(), subpass.clone());
         Renderer {
             gfx_queue,
             format: final_output_format,
             render_pass: None,
+            subpass,
             vertex_buffer,
             index_buffer,
             pipeline,
@@ -138,11 +140,12 @@ impl Renderer {
         let (vertex_buffer, index_buffer) = Self::create_buffers(gfx_queue.device().clone());
 
         let subpass = Subpass::from(render_pass.clone(), 0).unwrap();
-        let pipeline = Self::create_pipeline(gfx_queue.clone(), subpass);
+        let pipeline = Self::create_pipeline(gfx_queue.clone(), subpass.clone());
         Renderer {
             gfx_queue,
             format: final_output_format,
             render_pass: Some(render_pass),
+            subpass,
             vertex_buffer,
             index_buffer,
             pipeline,
@@ -413,11 +416,14 @@ impl Renderer {
     fn create_secondary_command_buffer_builder(
         &self,
     ) -> AutoCommandBufferBuilder<SecondaryAutoCommandBuffer> {
-        AutoCommandBufferBuilder::secondary_graphics(
+        AutoCommandBufferBuilder::secondary(
             self.gfx_queue.device().clone(),
             self.gfx_queue.family(),
             CommandBufferUsage::MultipleSubmit,
-            self.pipeline.subpass().clone(),
+            CommandBufferInheritanceInfo {
+                render_pass: Some(self.subpass.clone().into()),
+                ..Default::default()
+            },
         )
         .unwrap()
     }
