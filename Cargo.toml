@@ -17,11 +17,11 @@ bytemuck = "1.8.0"
 egui = "0.17.0"
 egui-winit = "0.17.0"
 image = "0.23.14"
-vulkano = { git = "https://github.com/VideowindoW/vulkano" }
-vulkano-shaders = { git = "https://github.com/VideowindoW/vulkano" }
+vulkano = { git = "https://github.com/VideowindoW/vulkano", branch = "dma_import" }
+vulkano-shaders = {  git = "https://github.com/VideowindoW/vulkano", branch = "dma_import" }
 winit = "0.26"
 
 [dev-dependencies]
 cgmath = "0.18.0"
 egui_demo_lib = "0.17.0"
-vulkano-win = { git = "https://github.com/VideowindoW/vulkano" }
+vulkano-win = {  git = "https://github.com/VideowindoW/vulkano", branch = "dma_import"  }
