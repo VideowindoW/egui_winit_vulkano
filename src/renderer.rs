@@ -15,9 +15,9 @@ use egui::{epaint::Mesh, ClippedMesh, Rect, TexturesDelta};
 use vulkano::{
     buffer::{BufferAccess, BufferUsage, CpuAccessibleBuffer, TypedBufferAccess},
     command_buffer::{
-        AutoCommandBufferBuilder, BlitImageInfo, CommandBufferUsage, CopyBufferToImageInfo,
-        PrimaryAutoCommandBuffer, PrimaryCommandBuffer, RenderPassBeginInfo,
-        SecondaryAutoCommandBuffer, SubpassContents, CommandBufferInheritanceInfo,
+        AutoCommandBufferBuilder, BlitImageInfo, CommandBufferInheritanceInfo, CommandBufferUsage,
+        CopyBufferToImageInfo, PrimaryAutoCommandBuffer, PrimaryCommandBuffer, RenderPassBeginInfo,
+        SecondaryAutoCommandBuffer, SubpassContents,
     },
     descriptor_set::{layout::DescriptorSetLayout, PersistentDescriptorSet, WriteDescriptorSet},
     device::{Device, Queue},
