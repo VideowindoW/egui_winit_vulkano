@@ -30,3 +30,8 @@ vulkano-shaders = "0.32"
 cgmath = "0.18.0"
 egui_demo_lib = "0.20.0"
 vulkano-util = "0.32"
+
+[patch.crates-io]
+vulkano = {git = "https://github.com/VideowindoW/vulkano", rev = "cccb62e"}
+vulkano-shaders =  {git = "https://github.com/VideowindoW/vulkano", rev = "cccb62e"}
+vulkano-win =  {git = "https://github.com/VideowindoW/vulkano", rev = "cccb62e"}
