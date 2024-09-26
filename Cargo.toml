@@ -17,12 +17,12 @@ links = ["egui-winit/links"]
 clipboard = ["egui-winit/clipboard"]
 
 [dependencies]
-ahash = "0.8.1"
-bytemuck = "1.12.2"
-egui = "0.20.1"
-egui-winit = "0.20.1"
-image = "0.24.4"
-winit = "0.27.5"
+ahash = "0.8"
+bytemuck = "1.12"
+egui = "0.20"
+egui-winit = { version = "0.20", default-features = false, features = ["wayland"]}
+image = "0.24"
+winit = { version = "0.27", default-features = false, features = ["x11", "wayland", "wayland-dlopen"]}
 vulkano = "0.32"
 vulkano-shaders = "0.32"
 
